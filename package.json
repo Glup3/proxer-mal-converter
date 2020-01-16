@@ -1,0 +1,21 @@
+{
+  "name": "proxer-mal-converter",
+  "version": "1.0.0",
+  "description": "",
+  "main": "js/index.js",
+  "scripts": {
+    "start": "serve .",
+    "watch": "watchify index.js -o bundle.js -v",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Phuc Tran",
+  "license": "MIT",
+  "devDependencies": {
+    "browserify": "^16.5.0",
+    "serve": "^11.3.0",
+    "watchify": "^3.11.1"
+  },
+  "dependencies": {
+    "proxer-list-exporter": "^1.0.2"
+  }
+}
