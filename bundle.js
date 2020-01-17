@@ -14,7 +14,7 @@ const onClicki = async () => {
     
     const html = await fetcher(id);
     const animes = getAnimes(html);
-    const xml = await exporter(animes, 90);
+    const xml = await exporter(animes, 85);
 
     const blob = new Blob([xml], { type: 'application/xml' });
     const now = new Date();
