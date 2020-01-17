@@ -1,10 +1,27 @@
 (function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u="function"==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({1:[function(require,module,exports){
 const fetcher = require('proxer-list-exporter/dist/index').fetchProxerAnimeListHTML;
+const getAnimes = require('proxer-list-exporter/dist/index').getAnimesFromHTML;
+const exporter = require('proxer-list-exporter/dist/index').exportAnimesToMALAnimeXML;
 
 const button = document.getElementById('convert-btn');
 
-const onClicki = () => {
-  fetcher('519518').then(a => console.log(a));  
+const onClicki = async () => {
+  try {
+    const id = document.getElementById('proxer-id').value;
+    button.innerHTML = 'Loading...';
+    button.disabled = true;
+    
+    const html = await fetcher(id);
+    const animes = getAnimes(html);
+    const xml = await exporter(animes, 90);
+
+    console.log('XML', xml);
+  } catch (e) {
+    console.log(e);
+  }
+
+  button.innerHTML = 'Export';
+  button.disabled = false;
 }
 
 button.addEventListener('click', onClicki);
@@ -29394,10 +29411,15 @@ const xmlbuilder_1 = __importDefault(require("xmlbuilder"));
  * DEFAULT Anilist API: 90 Requests per Minute
  * 60 seconds / 90 Requests = 667 ms per Request
  */
-const limiter = new bottleneck_1.default({
-    minTime: 700,
-    maxConcurrent: 1,
-});
+exports.createLimiter = (requestsPerMinute = 90) => {
+    return new bottleneck_1.default({
+        reservoir: requestsPerMinute,
+        reservoirRefreshAmount: requestsPerMinute,
+        reservoirRefreshInterval: 60 * 1000,
+        maxConcurrent: 1,
+        minTime: (60 * 1000) / requestsPerMinute,
+    });
+};
 const convertProxerTypeToMALType = (type) => {
     switch (type) {
         case 'TV':
@@ -29424,7 +29446,7 @@ const convertProxerStatusToMALStatus = (status) => {
             return null;
     }
 };
-exports.getMALIDFromAnilist = async (name, type) => {
+exports.getMALIDFromAnilist = async (name, type, limiter) => {
     const query = `
     query ($query: String, $type: MediaType, $format: MediaFormat) {
       Page (perPage: 1) {
@@ -29439,19 +29461,18 @@ exports.getMALIDFromAnilist = async (name, type) => {
       }
     }
   `;
-    const result = await graphql_request_1.request('https://graphql.anilist.co', query, {
+    const result = await limiter.schedule(() => graphql_request_1.request('https://graphql.anilist.co', query, {
         query: name,
         type: 'ANIME',
         format: type,
-    });
+    }).catch(e => {
+        console.log(e);
+    }));
     const anime = result.Page.media[0];
-    return anime.idMal;
+    return anime != null ? anime.idMal : null;
 };
-exports.exportAnimesToMALAnimeXML = async (animes) => {
-    const result = await limiter.schedule(() => {
-        const allTasks = animes.map(x => exports.getMALIDFromAnilist(x.title, x.type));
-        return Promise.all(allTasks);
-    });
+exports.exportAnimesToMALAnimeXML = async (animes, requestsPerMinute = 90) => {
+    const result = await Promise.all(animes.map(x => exports.getMALIDFromAnilist(x.title, x.type, exports.createLimiter(requestsPerMinute))));
     const root = xmlbuilder_1.default.create('myanimelist');
     root.com('Created by Glup3 - last update 15-01-2020');
     for (let index = 0; index < result.length; index++) {
@@ -29502,7 +29523,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const axios_1 = __importDefault(require("axios"));
 const cheerio_1 = __importDefault(require("cheerio"));
 // Glup3 ID: 519518
-const proxerURL = 'https://proxer.me/user';
+const proxerURL = 'https://cors-anywhere.herokuapp.com/https://proxer.me/user';
 var ListType;
 (function (ListType) {
     ListType["ANIME"] = "anime";
